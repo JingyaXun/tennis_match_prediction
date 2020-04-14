@@ -91,6 +91,9 @@ if __name__=='__main__':
 	#                 start_year=START_YEAR)
 
 	df = atp_all_matches
+	
+	# do the grid search for optimal k1 k2 in Stephanie's rating update equation
+	grid_search_k1k2(df)
 
 	df['elo_diff'] = [df['w_elo'][i] - df['l_elo'][i] for i in xrange(len(df))]
 	df['sf_elo_diff'] = [df['w_sf_elo'][i] - df['l_sf_elo'][i] for i in xrange(len(df))]
@@ -202,3 +205,20 @@ print 'elo 538 baseline: ',  sum((df['elo_diff_538']>0))/float(len(df))
 # print log_loss(df['winner'],[(1+10**(diff/-400.))**-1 for diff in df['elo_diff_538']])
 # print log_loss(df['winner'],[(1+10**(diff/-400.))**-1 for diff in df['sf_elo_diff_538']])
 print 'surface elo 538 baseline: ', sum(df['sf_elo_diff_538']>0)/float(len(df))
+
+
+def grid_search_k1k2(atp_all_matches1):
+    atp_all_matches = atp_all_matches1
+    K1, K2, ACC = 0, 0, 0
+    for k1 in xrange(100):
+        for k2 in xrange(100):
+            atp_all_matches = stephanie_generate_elo(atp_all_matches, k1, k2)
+            df['elo_diff'] = [df['p0_elo'][i] - df['p1_elo'][i] for i in xrange(len(df))]
+            df2 = df[df['match_year']==2017].reset_index(drop=True)
+            acc = sum((df2['elo_diff']>0) == df['winner'])/float(len(df2))
+            print 'baseline: ',  acc, "k1, k2: ", k1, " ", k2
+            if acc > ACC:
+                ACC = acc
+                K1 = k1
+                K2 = k2
+    print "best accuracy: ", ACC, "k1, k2: ", K1, K2
