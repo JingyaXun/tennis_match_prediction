@@ -164,8 +164,10 @@ class Elo_Rater(object):
     
     def stephanie_update_rate(self, rating, k1, k2, delta1, delta2, *argv):
         product_of_scales = np.prod(argv) if len(argv) > 0 else 1
-        rating.value = float(rating.value) + (float(k1) * delta1 + float(k2) * delta2) * product_of_scales
+        # print "prod, delta1, delta2: ", product_of_scales, delta1, delta2
+        rating.value = float(rating.value) + (float(k1) * float(delta1) + float(k2) * float(delta2)) * product_of_scales
         rating.times += 1
+        # print "rating.value, k1, k2, delta1, delta2, prod: ", rating.value, k1, k2, delta1, delta2, product_of_scales
         return rating
 
     # def adjust_1vs1(self, rating1, rating2, drawn=False):
@@ -178,6 +180,14 @@ class Elo_Rater(object):
                 self.rate(rating2, [scores[1], r1], is_gs, counts, tny_name, tny_round_name))
     
     def stephanie_rate_1vs1(self, rating1, rating2, k1, k2, delta1, delta2, *argv):
-        return (self.stephanie_update_rate(rating1, k1, k2, delta1, delta2, *argv),
-            self.stephanie_update_rate(rating2, k1, k2, -delta1, -delta2, *argv))
+        try:
+            delta1 = float(delta1)
+        except:
+            delta1 = 0.5
+        try:
+            delta2 = float(delta2)
+        except:
+            delta1 = 0.5
+        return (self.stephanie_update_rate(rating1, k1, k2, float(delta1), float(delta2), *argv),
+            self.stephanie_update_rate(rating2, k1, k2, -float(delta1), -float(delta2), *argv))
 
