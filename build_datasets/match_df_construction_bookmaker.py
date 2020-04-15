@@ -81,7 +81,7 @@ if __name__ == '__main__':
     atp_year_list = []
     # for i in xrange(2001,2019):
     #     atp_year_list.append(pd.read_csv("../my_data/.csv".format(i)))
-    df = pd.read_csv("../my_data/bookmaker_delta2.csv")
+    df = pd.read_csv("../my_data/bookmaker_delta3.csv")
 
     # these may be changes specific to atp dataframe; normalize_name() is specific to atp/wta...
     df = df.rename(columns={'winner': 'w_name', 'loser': 'l_name', 'tourney_year_id': 'tny_id', \
@@ -109,14 +109,15 @@ if __name__ == '__main__':
 
     # do the grid search for optimal k1 k2 in Stephanie's rating update equation
     # grid_search_k1k2(atp_all_matches)
-    atp_all_matches = generate_elo(atp_all_matches, 0)
-    # atp_all_matches = stephanie_generate_elo(atp_all_matches, 76, 20)
-    # df = atp_all_matches
-    # df['elo_diff'] = [df['w_elo'][i] - df['l_elo'][i] for i in xrange(len(df))]
-    # df2 = df[df['match_year'] == 2016].reset_index(drop=True)
-    # acc = sum((df2['elo_diff']>0)) / float(len(df2))
-    # # print df2['elo_diff']
-    # print 'baseline: ', acc, "k1, k2: ", 20, " ", 30
+    # atp_all_matches = generate_elo(atp_all_matches, 0)
+    # atp_all_matches = generate_elo(atp_all_matches, 1)
+    atp_all_matches = stephanie_generate_elo(atp_all_matches, 2.5, 24)
+    df = atp_all_matches
+    df['elo_diff'] = [df['w_elo'][i] - df['l_elo'][i] for i in xrange(len(df))]
+    df2 = df[df['match_year'] == 2017].reset_index(drop=True)
+    acc = sum((df2['elo_diff']>0)) / float(len(df2))
+    # print df2['elo_diff']
+    print 'baseline: ', acc, "k1, k2: ", 20, " ", 30
 
 
     # generate tourney stats from one year behind START_DATE for stats_52

@@ -55,9 +55,21 @@ class Elo_Rater(object):
         f_factor = 2 * self.beta  # rating disparity
         return 1. / (1 + 10 ** (diff / f_factor))
 
+    def stephanie_expect(self, rating, other_rating_val, delta2):
+        """The "E" function in Elo. It calculates the expected score of the
+        first rating by the second rating.
+        """
+        # http://www.chess-mind.com/en/elo-system
+        diff = float(other_rating_val) - float(rating.value)
+        print delta2
+        return 1. / (1 + 10 ** (diff / (delta2 * 10000)))
+
     def adjust(self, rating, series):
         """Calculates the adjustment value."""
         return series[0] - self.expect(rating, series[1])
+
+    def stephanie_adjust(self, rating, series, delta2):
+        return series[0] - self.stephanie_expect(rating, series[1], delta2)
 
     def step_decay_k(self, rating, counts):
         if counts:
@@ -162,10 +174,12 @@ class Elo_Rater(object):
         rating.times += 1
         return rating
     
-    def stephanie_update_rate(self, rating, k1, k2, delta1, delta2, *argv):
-        product_of_scales = np.prod(argv) if len(argv) > 0 else 1
+    def stephanie_update_rate(self, rating, k1, k2, delta1, delta2, series, *argv):
+        # product_of_scales = np.prod(argv) if len(argv) > 0 else 1
         # print "prod, delta1, delta2: ", product_of_scales, delta1, delta2
-        rating.value = float(rating.value) + (float(k1) * float(delta1) + float(k2) * float(delta2)) * product_of_scales
+        rating.value = float(rating.value) + float(k1) * float(delta1) + float(k2) * float(delta2)
+
+        # rating.value = float(rating.value) + float(k2) * self.stephanie_adjust(rating, series, delta2)
         rating.times += 1
         # print "rating.value, k1, k2, delta1, delta2, prod: ", rating.value, k1, k2, delta1, delta2, product_of_scales
         return rating
@@ -180,6 +194,7 @@ class Elo_Rater(object):
                 self.rate(rating2, [scores[1], r1], is_gs, counts, tny_name, tny_round_name))
     
     def stephanie_rate_1vs1(self, rating1, rating2, k1, k2, delta1, delta2, *argv):
+        scores = (WIN, LOSS)
         try:
             delta1 = float(delta1)
         except:
@@ -187,7 +202,7 @@ class Elo_Rater(object):
         try:
             delta2 = float(delta2)
         except:
-            delta1 = 0.5
-        return (self.stephanie_update_rate(rating1, k1, k2, float(delta1), float(delta2), *argv),
-            self.stephanie_update_rate(rating2, k1, k2, -float(delta1), -float(delta2), *argv))
+            delta2 = 0.5
+        return (self.stephanie_update_rate(rating1, k1, k2, float(delta1), float(delta2), [scores[0], rating2.value], *argv),
+            self.stephanie_update_rate(rating2, k1, k2, -float(delta1), -float(delta2), [scores[0], rating1.value], *argv))
 
