@@ -174,15 +174,29 @@ class Elo_Rater(object):
         rating.times += 1
         return rating
     
-    def stephanie_update_rate(self, rating, k1, k2, delta1, delta2, series, *argv):
+    def stephanie_update_rate(self, rating, k1, k2, delta1, delta2, series, w_name, l_name, is_gs=False, counts=False, **kwargs):
         # product_of_scales = np.prod(argv) if len(argv) > 0 else 1
         # print "prod, delta1, delta2: ", product_of_scales, delta1, delta2
-        rating.value = float(rating.value) + float(k1) * float(delta1) + float(k2) * float(delta2)
+        # rating.value = float(rating.value) + float(k1) * float(delta1) + float(k2) * float(delta2)
+        k = self.calculate_k(rating,counts)*1.1 if is_gs else self.calculate_k(rating,counts)
+        rate_scale = 1+18/(1+2**((float(rating.value)-1500)/63))
+
+        # calculate scaler base on tournament level
+        tny_scale = self.s_tournament(kwargs['tny_name'])
+
+        # calculate scaler base on match type
+        tny_round_scale = self.s_tny_round_name(kwargs['tny_round_name'])
+        rating.value = float(rating.value) + k * self.adjust(rating, series) * self.avg_scalers([tny_round_scale,tny_scale,rate_scale])
 
         # rating.value = float(rating.value) + float(k2) * self.stephanie_adjust(rating, series, delta2)
         rating.times += 1
         # print "rating.value, k1, k2, delta1, delta2, prod: ", rating.value, k1, k2, delta1, delta2, product_of_scales
         return rating
+
+    def increase_k(self, rating):
+        k1 = 1 + rating.times * 0.01
+        k2 = 10 + rating.times * 0.01
+        return (k1, k2)
 
     # def adjust_1vs1(self, rating1, rating2, drawn=False):
     #     return self.adjust(rating1, [(DRAW if drawn else WIN, rating2)])
@@ -193,7 +207,7 @@ class Elo_Rater(object):
         return (self.rate(rating1, [scores[0], r2], is_gs, counts, tny_name, tny_round_name),
                 self.rate(rating2, [scores[1], r1], is_gs, counts, tny_name, tny_round_name))
     
-    def stephanie_rate_1vs1(self, rating1, rating2, k1, k2, delta1, delta2, *argv):
+    def stephanie_rate_1vs1(self, rating1, rating2, k1, k2, delta1, delta2, w_name, l_name, is_gs=False, counts=False, **kwargs):
         scores = (WIN, LOSS)
         try:
             delta1 = float(delta1)
@@ -203,6 +217,6 @@ class Elo_Rater(object):
             delta2 = float(delta2)
         except:
             delta2 = 0.5
-        return (self.stephanie_update_rate(rating1, k1, k2, float(delta1), float(delta2), [scores[0], rating2.value], *argv),
-            self.stephanie_update_rate(rating2, k1, k2, -float(delta1), -float(delta2), [scores[0], rating1.value], *argv))
+        return (self.stephanie_update_rate(rating1, k1, k2, float(delta1), float(delta2), [scores[0], rating2.value], w_name, l_name, is_gs, counts, **kwargs),
+            self.stephanie_update_rate(rating2, k1, k2, -float(delta1), -float(delta2), [scores[0], rating1.value], w_name, l_name, is_gs, counts, **kwargs))
 

@@ -100,7 +100,7 @@ def generate_elo(df,counts_i):
     return df
 
 # takes in a dataframe of matches in atp/wta format and returns the dataframe with elo columns
-def stephanie_generate_elo(df, k1, k2):
+def stephanie_generate_elo(df, k1, k2, counts):
     players_list = np.union1d(df.w_name, df.l_name)
     players_elo = dict(zip(list(players_list), [elo.Rating() for __ in range(len(players_list))]))
     surface_elo = {}
@@ -119,18 +119,32 @@ def stephanie_generate_elo(df, k1, k2):
         delta1, delta2 = row['w_delta1'], row['w_delta2']
         # print delta1, delta2, row['l_delta1'], row['l_delta2']
         elo_1s.append(w_elo.value);elo_2s.append(l_elo.value)
-        
-        elo_obj.stephanie_rate_1vs1(players_elo[row['w_name']],players_elo[row['l_name']], k1, k2, delta1, delta2)
+
+        # get different kinds of precalculated scalers
+        s_tournament_w = row['s_tournament_w']
+        s_tournament_l = row['s_tournament_l']
+        s_match_duration_w = row['s_match_duration_w']
+        s_match_duration_l = row['s_match_duration_l']
+        tny_name = row['tny_name']
+        tny_round_name = row['tourney_round_name']
+        is_gs = row['is_gs']
+        surface = row['surface']
+
+
+        elo_obj.stephanie_rate_1vs1(w_elo, l_elo, k1, k2, delta1, delta2, row['w_name'], row['l_name'], is_gs=is_gs, counts=counts, s_tournament_w=s_tournament_w, s_tournament_l=s_tournament_l, s_match_duration_w=s_match_duration_w, s_match_duration_l=s_match_duration_l, tny_name=tny_name, tny_round_name=tny_round_name)
 
         
         surface_elo_1s.append(surface_elo[surface][row['w_name']].value if surface in ('Hard','Clay','Grass') else w_elo.value)
         surface_elo_2s.append(surface_elo[surface][row['l_name']].value if surface in ('Hard','Clay','Grass') else l_elo.value)
         if surface in ('Hard','Clay','Grass'):
-            new_elo1, new_elo2 = elo_obj.stephanie_rate_1vs1(surface_elo[surface][row['w_name']],surface_elo[surface][row['l_name']], k1, k2, delta1, delta2)
+            new_elo1, new_elo2 = elo_obj.stephanie_rate_1vs1(surface_elo[surface][row['w_name']],surface_elo[surface][row['l_name']], k1, k2, delta1, delta2, row['w_name'], row['l_name'], is_gs=is_gs, counts=counts, s_tournament_w=s_tournament_w, s_tournament_l=s_tournament_l, s_match_duration_w=s_match_duration_w, s_match_duration_l=s_match_duration_l, tny_name=tny_name, tny_round_name=tny_round_name)
 
-    # add columns
-    df['w_elo'], df['l_elo'] = elo_1s, elo_2s
-    df['w_sf_elo'], df['l_sf_elo'] = surface_elo_1s, surface_elo_2s
+    if counts:
+        df['w_elo_538'], df['l_elo_538'] = elo_1s, elo_2s
+        df['w_sf_elo_538'], df['l_sf_elo_538'] = surface_elo_1s, surface_elo_2s
+    else:
+        df['w_elo'], df['l_elo'] = elo_1s, elo_2s
+        df['w_sf_elo'], df['l_sf_elo'] = surface_elo_1s, surface_elo_2s
     return df
 
 
