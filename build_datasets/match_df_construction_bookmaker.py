@@ -210,6 +210,9 @@ if __name__=='__main__':
 	#                 start_year=START_YEAR)
 
 	df = atp_all_matches
+	
+	# do the grid search for optimal k1 k2 in Stephanie's rating update equation
+	grid_search_k1k2(df)
 
 	df['elo_diff'] = [df['w_elo'][i] - df['l_elo'][i] for i in xrange(len(df))]
 	df['sf_elo_diff'] = [df['w_sf_elo'][i] - df['l_sf_elo'][i] for i in xrange(len(df))]
