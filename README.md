@@ -1,5 +1,22 @@
 # tennis_match_prediction
 
+## Get Started
+
+To run the pre-match prediction, run the following command in the terminal
+
+```
+python2 match_df_construction_bookmaker.py --test_year 2010 2011 2012 2013 2014 2015 2016 2017 2018 2019
+```
+
+This will generate elo ratings from 2001 to 2019, and print out prediction accuacies from 2010 to 2019. 
+
+To update K with the three additional features described in the report, please uncomment the code in rate() in elo_538.py. Detailed description on the three features can be found in Tennis_Prediction.pdf
+
+Data can be downloaded [here](https://drive.google.com/file/d/12gmvB41brLibGojE5pHbLsmsgT7jS_ix/view?usp=sharing).
+
+
+======================================Below is the original README=================================
+
 		2017 Australian Open Men's Singles Final
 ![alt text](samples/federer_nadal_ao_17.png)
 

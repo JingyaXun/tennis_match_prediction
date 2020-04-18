@@ -1,5 +1,5 @@
 # modify this for your own path
-SCRIPT_PATH = '/Users/jingyaxun/Documents/research/tennis_prediction/tennis_match_prediction/build_datasets/sackmann'
+SCRIPT_PATH = '/sackmann'
 TOUR = 'atp'
 COUNT = False
 START_YEAR = 2000
@@ -8,8 +8,6 @@ ONLY_PBP = 0
 
 import sys
 sys.path.insert(0,SCRIPT_PATH)
-import tennisGameProbability,tennisMatchProbability,tennisSetProbability,tennisTiebreakProbability
-from tennisMatchProbability import matchProb
 from helper_functions import *
 from data_functions import *
 import pandas as pd
@@ -18,6 +16,115 @@ import numpy as np
 import re
 import math
 import copy
+import argparse
+from multiprocessing import Pool
+import signal
+
+def initializer():
+    """Ignore CTRL+C in the worker process."""
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+
+def f(atp_all_matches1, k1):
+    kk1, kk2, a = 0, 0, 0
+    for k2 in xrange(1, 101):
+        atp_all_matches = stephanie_generate_elo(atp_all_matches1, k1, k2)
+        df = atp_all_matches
+        df['elo_diff'] = [df['w_elo'][i] - df['l_elo'][i] for i in xrange(len(df))]
+        df2 = df[df['match_year'] == 2017].reset_index(drop=True)
+        acc = sum((df2['elo_diff'] > 0)) / float(len(df2))
+        print 'baseline: ', acc, "k1, k2: ", k1, " ", k2
+        if acc > a:
+            a = acc
+            kk1 = k1
+            kk2 = k2
+    return (a, kk1, kk2)
+
+    
+
+def g(atp_all_matches1, h1):
+    hh1, hh2, a = 0, 0, 0
+    tmp = []
+    for h2 in xrange(50, 101):
+        atp_all_matches = generate_elo_stephanie(atp_all_matches1, 1, h1, h2)
+        # print atp_all_matches
+        df = atp_all_matches
+        # df['elo_diff'] = [df['w_elo'][i] - df['l_elo'][i] for i in xrange(len(df))]
+        df['sf_elo_diff_538'] = [df['w_elo_538'][i] - df['l_elo_538'][i] for i in xrange(len(df))]
+        for j in [2008, 2009, 2010, 2011, 2012]:
+            df2 = df[df['match_year'] == j].reset_index(drop=True)
+            tmp.append(sum((df2['sf_elo_diff_538'] > 0)) / float(len(df2)))
+        acc = np.mean(tmp)
+        print 'baseline: ', acc, "h1, h2: ", h1, " ", h2
+        if acc > a:
+            a = acc
+            hh1 = h1
+            hh2 = h2
+    return (a, hh1, hh2)
+
+
+def grid_search_k1k2(atp_all_matches1):
+    try:
+        K1, K2, ACC = 0, 0, 0
+        pool = Pool(processes=10, initializer=initializer)
+        # multiple_results = pool.map(f, xrange(1, 101))
+        multiple_results = [pool.apply_async(f, args=(atp_all_matches1, i)) for i in xrange(1, 101)]
+        pool.close()
+        pool.join()
+        results = [i.get() for i in multiple_results]
+        for result in results:
+            if ACC < result[0]:
+                K1 = result[1]
+                K2 = result[2]
+        # for k1 in xrange(1, 101):
+        #     for k2 in xrange(1, 101):
+        #         atp_all_matches = stephanie_generate_elo(atp_all_matches1, k1, k2)
+        #         df = atp_all_matches
+        #         df['elo_diff'] = [df['w_elo'][i] - df['l_elo'][i] for i in xrange(len(df))]
+        #         df2 = df[df['match_year']==2017].reset_index(drop=True)
+        #         acc = sum((df2['elo_diff']>0))/float(len(df2))
+        #         print 'baseline: ',  acc, "k1, k2: ", k1, " ", k2
+        #         if acc > ACC:
+        #             ACC = acc
+        #             K1 = k1
+        #             K2 = k2
+        print "best accuracy: ", ACC, "k1, k2: ", K1, K2
+    except KeyboardInterrupt:
+        pool.terminate()
+        pool.join()
+
+def grid_search_h1h2(atp_all_matches1):
+    try:
+        h1, h2, ACC = 0, 0, 0
+        pool = Pool(processes=10, initializer=initializer)
+        # multiple_results = pool.map(f, xrange(1, 101))
+        multiple_results = [pool.apply_async(g, args=(atp_all_matches1, i)) for i in xrange(1, 50)]
+        pool.close()
+        pool.join()
+        results = [i.get() for i in multiple_results]
+        for result in results:
+            if ACC < result[0]:
+                h1 = result[1]
+                h2 = result[2]
+
+        # for k1 in xrange(1, 101):
+        #     for k2 in xrange(1, 101):
+        #         atp_all_matches = stephanie_generate_elo(atp_all_matches1, k1, k2)
+        #         df = atp_all_matches
+        #         df['elo_diff'] = [df['w_elo'][i] - df['l_elo'][i] for i in xrange(len(df))]
+        #         df2 = df[df['match_year']==2017].reset_index(drop=True)
+        #         acc = sum((df2['elo_diff']>0))/float(len(df2))
+        #         print 'baseline: ',  acc, "k1, k2: ", k1, " ", k2
+        #         if acc > ACC:
+        #             ACC = acc
+        #             K1 = k1
+        #             K2 = k2
+        print "best accuracy: ", ACC, "h1, h2: ", h1, h2
+    except KeyboardInterrupt:
+        pool.terminate()
+        pool.join()
+
+
 
 if __name__=='__main__':
 	print 'main'
@@ -31,6 +138,8 @@ if __name__=='__main__':
 	                        'tourney_name_x':'tny_name','start_date':'tny_date',\
                             'winner_first_serve_points_won':'w_1stWon',\
                             'winner_second_serve_points_won':'w_2ndWon',\
+							'winner_total_points_won': 'w_pt_won','loser_total_points_won': 'l_pt_won',\
+							'winner_total_points_total':'pt_total',\
                             'loser_first_serve_points_won':'l_1stWon',\
                             'loser_second_serve_points_won':'l_2ndWon',\
                             'match_index':'match_num','winner_player_id':'winner_id','loser_player_id':'loser_id',\
@@ -39,6 +148,8 @@ if __name__=='__main__':
 							'M4 Delta Winner':'w_delta1',\
 							'M4 Delta Loser':'l_delta1',\
                             })
+
+	# df = df.dropna(subset=['w_name', 'l_name', 'tny_name'])
 	df['w_name'] = [normalize_name(x,tour=TOUR) for x in df['w_name']]
 	df['l_name'] = [normalize_name(x,tour=TOUR) for x in df['l_name']]
 	df['tny_name'] = ['Davis Cup' if 'Davis Cup' in s else s for s in df['tny_name']]
@@ -49,11 +160,19 @@ if __name__=='__main__':
 	abd_strings = ('abandoned','ABN','ABD','DEF','def','unfinished','Walkover')
 	atp_all_matches = format_match_df(df,ret_strings=ret_strings,abd_strings=abd_strings)
 
+
 	# generate tourney stats from one year behind START_DATE for stats_52
 	# get elo with constant and dynamic K
 	start_ind = atp_all_matches[atp_all_matches['match_year']>=START_YEAR-1].index[0]
+    
 	atp_all_matches = generate_elo(atp_all_matches,0)
 	atp_all_matches = generate_elo(atp_all_matches,1)
+
+	# atp_all_matches = grid_search_h1h2(atp_all_matches)
+
+    # atp_all_matches = generate_elo_stephanie(atp_all_matches,0)
+    # atp_all_matches = generate_elo_stephanie(atp_all_matches,1)
+
 	# atp_all_matches = generate_52_stats(atp_all_matches,start_ind)
 	# atp_all_matches = generate_52_adj_stats(atp_all_matches,start_ind)
 	# atp_all_matches = generate_tny_stats(atp_all_matches,start_ind)
@@ -116,59 +235,6 @@ if __name__=='__main__':
 
 	df = df.reset_index(drop=True)
 
-	# cols = ['52_s_adj','52_r_adj']
-	# test_df = generate_JS_stats(df,cols)
-
-	# keep relevant columns
-	# df = df[['tny_id','tny_name','surface','tny_date','match_year','match_month',
-	#          u'p0_name', u'p1_name', u'p0_elo',
-	#          u'p1_elo', u'p0_sf_elo', u'p1_sf_elo', u'p0_elo_538', u'p1_elo_538',
-	#          u'p0_sf_elo_538', u'p1_sf_elo_538', u'p0_52_swon',u'p0_52_svpt', 
-	#          u'p1_52_swon', u'p1_52_svpt', u'p0_52_rwon', u'p0_52_rpt',
-	#          u'p1_52_rwon', u'p1_52_rpt', 
-	#          u'elo_diff', u'sf_elo_diff',
-	#          u'elo_diff_538', u'sf_elo_diff_538',
-	#          u'p0_s_pct', u'p0_r_pct', u'p1_s_pct', u'p1_r_pct', 
-	#          u'p0_s_pct_JS', u'p1_s_pct_JS', u'p0_r_pct_JS', u'p1_r_pct_JS',
-	#          u'p0_sf_52_swon', u'p0_sf_52_svpt',u'p1_sf_52_swon', u'p1_sf_52_svpt', 
-	#          u'p0_sf_52_rwon', u'p0_sf_52_rpt', u'p1_sf_52_rwon', u'p1_sf_52_rpt',
-	#          u'p0_sf_s_pct', u'p0_sf_r_pct', u'p1_sf_s_pct', u'p1_sf_r_pct', 
-	#          u'p0_sf_s_pct_JS', u'p1_sf_s_pct_JS', u'p0_sf_r_pct_JS', u'p1_sf_r_pct_JS',
-	#          u'p0_52_s_adj',u'p0_52_r_adj',u'p1_52_s_adj',u'p1_52_r_adj',
-	#          u'p0_52_s_adj_JS',u'p0_52_r_adj_JS',u'p1_52_s_adj_JS',u'p1_52_r_adj_JS',
-	#          u'avg_52_s', u'avg_52_r', u'sf_avg_52_s', u'sf_avg_52_r',
-	#          'tny_stats','best_of','score','pbp',
-	#          'logit_elo_538_prob', #'logit_elo_prob','logit_elo_diff_prob','logit_elo_diff_538_prob',
-	#          'winner']]
-
-	# binary indicator for whether player 0 won
-	# df['winner'] = [1-winner for winner in df['winner']]
-
-	# generate serving probabilities for Klaassen-Magnus model
-	# df['match_id'] = range(len(df))
-	# df['tny_stats'] = [df['avg_52_s'][i] if df['tny_stats'][i]==0 else df['tny_stats'][i] for i in xrange(len(df))]
-	# df['p0_s_kls'] = df['tny_stats']+(df['p0_s_pct']-df['avg_52_s']) - (df['p1_r_pct']-df['avg_52_r'])
-	# df['p1_s_kls'] = df['tny_stats']+(df['p1_s_pct']-df['avg_52_s']) - (df['p0_r_pct']-df['avg_52_r'])
-	# df['p0_s_kls_JS'] = df['tny_stats']+(df['p0_s_pct_JS']-df['avg_52_s']) - (df['p1_r_pct_JS']-df['avg_52_r'])
-	# df['p1_s_kls_JS'] = df['tny_stats']+(df['p1_s_pct_JS']-df['avg_52_s']) - (df['p0_r_pct_JS']-df['avg_52_r'])
-	# df['p0_sf_s_kls'] = df['tny_stats']+(df['p0_sf_s_pct']-df['sf_avg_52_s']) - (df['p1_sf_r_pct']-df['sf_avg_52_r'])
-	# df['p1_sf_s_kls'] = df['tny_stats']+(df['p1_sf_s_pct']-df['sf_avg_52_s']) - (df['p0_sf_r_pct']-df['sf_avg_52_r'])
-	# df['p0_sf_s_kls_JS'] = df['tny_stats']+(df['p0_sf_s_pct_JS']-df['sf_avg_52_s']) - (df['p1_sf_r_pct_JS']-df['sf_avg_52_r'])
-	# df['p1_sf_s_kls_JS'] = df['tny_stats']+(df['p1_sf_s_pct_JS']-df['sf_avg_52_s']) - (df['p0_sf_r_pct_JS']-df['sf_avg_52_r'])
-	# df['p0_s_kls_adj'] = df['tny_stats']+(df['p0_52_s_adj']) - (df['p1_52_r_adj'])
-	# df['p1_s_kls_adj'] = df['tny_stats']+(df['p1_52_s_adj']) - (df['p0_52_r_adj'])
-	# df['p0_s_kls_adj_JS'] = df['tny_stats']+(df['p0_52_s_adj_JS']) - (df['p1_52_r_adj_JS'])
-	# df['p1_s_kls_adj_JS'] = df['tny_stats']+(df['p1_52_s_adj_JS']) - (df['p0_52_r_adj_JS'])
-
-
-
-	# generate match probabilities and z-scores for Klaassen method, with and w/o JS estimators
-	# df['match_prob_kls'] = [matchProb(row['p0_s_kls'],1-row['p1_s_kls']) for i,row in df.iterrows()]
-	# df['match_prob_kls_JS'] = [matchProb(row['p0_s_kls_JS'],1-row['p1_s_kls_JS']) for i,row in df.iterrows()]
-	# df['match_prob_sf_kls'] = [matchProb(row['p0_sf_s_kls'],1-row['p1_sf_s_kls']) for i,row in df.iterrows()]
-	# df['match_prob_sf_kls_JS'] = [matchProb(row['p0_sf_s_kls_JS'],1-row['p1_sf_s_kls_JS']) for i,row in df.iterrows()]
-	# df['match_prob_adj_kls'] = [matchProb(row['p0_s_kls_adj'],1-row['p1_s_kls_adj']) for i,row in df.iterrows()]
-	# df['match_prob_adj_kls_JS'] = [matchProb(row['p0_s_kls_adj_JS'],1-row['p1_s_kls_adj_JS']) for i,row in df.iterrows()]
 
 	print "useless stuff"
 	# generate win probabilities from elo differences
@@ -194,31 +260,43 @@ if __name__=='__main__':
 # df = pd.read_csv('../my_data/elo_pbp_with_surface_11_26_dynamic_rating_tny_level_wrong.csv')
 # del df['Unnamed: 0']
 
-# currently looking at 2014 tour-level matches, excluding Davis Cup
-df = df[df['match_year']==2017].reset_index(drop=True)
+# print(df)
 
-print 'elo baseline: ',  sum((df['elo_diff']>0))/float(len(df))
-# print log_loss(df['winner'],[(1+10**(diff/-400.))**-1 for diff in df['elo_diff']])
-# print log_loss(df['winner'],[(1+10**(diff/-400.))**-1 for diff in df['sf_elo_diff']])
-print 'surface elo baseline: ', sum(df['sf_elo_diff']>0)/float(len(df))
-print 'elo 538 baseline: ',  sum((df['elo_diff_538']>0))/float(len(df))
-# print log_loss(df['winner'],[(1+10**(diff/-400.))**-1 for diff in df['elo_diff_538']])
-# print log_loss(df['winner'],[(1+10**(diff/-400.))**-1 for diff in df['sf_elo_diff_538']])
-print 'surface elo 538 baseline: ', sum(df['sf_elo_diff_538']>0)/float(len(df))
+parser = argparse.ArgumentParser(description='Short sample app')
+parser.add_argument('--test_year', nargs='+', type=int)
 
+years = []
+for _, value in parser.parse_args()._get_kwargs():
+    if value is not None:
+        years = value
 
-def grid_search_k1k2(atp_all_matches1):
-    atp_all_matches = atp_all_matches1
-    K1, K2, ACC = 0, 0, 0
-    for k1 in xrange(100):
-        for k2 in xrange(100):
-            atp_all_matches = stephanie_generate_elo(atp_all_matches, k1, k2)
-            df['elo_diff'] = [df['p0_elo'][i] - df['p1_elo'][i] for i in xrange(len(df))]
-            df2 = df[df['match_year']==2017].reset_index(drop=True)
-            acc = sum((df2['elo_diff']>0) == df['winner'])/float(len(df2))
-            print 'baseline: ',  acc, "k1, k2: ", k1, " ", k2
-            if acc > ACC:
-                ACC = acc
-                K1 = k1
-                K2 = k2
-    print "best accuracy: ", ACC, "k1, k2: ", K1, K2
+for test_year in years:
+	df_test = df[df['match_year'] == test_year].reset_index(drop=True)
+
+	df_test_hard = df_test[df_test['surface'] == 'Hard'].reset_index(drop=True)
+	df_test_grass = df_test[df_test['surface'] == 'Grass'].reset_index(drop=True)
+	df_test_clay = df_test[df_test['surface'] == 'Clay'].reset_index(drop=True)
+	df_test_carpet = df_test[df_test['surface'] == 'Carpet'].reset_index(drop=True)
+	df_test_nan = df_test[ (df_test['surface'] != 'Clay') & (df_test['surface'] != 'Grass') & (df_test['surface'] != 'Hard') & (df_test['surface'] != 'Carpet')].reset_index(drop=True)
+	
+	df_test_3surface = df_test[ (df_test['surface'] == 'Clay') | (df_test['surface'] == 'Grass') | (df_test['surface'] == 'Hard')].reset_index(drop=True)
+
+	print 'year: ', test_year
+	print 'elo baseline: ',  sum((df_test['elo_diff']>0))/float(len(df_test))
+	print 'surface elo baseline: ', sum(df_test['sf_elo_diff']>0)/float(len(df_test))
+	print 'elo 538 baseline: ',  sum((df_test['elo_diff_538']>0))/float(len(df_test))
+	print 'surfaces elo 538 baseline: ', sum(df_test['sf_elo_diff_538']>0)/float(len(df_test))
+
+	print '3 surfaces elo 538 baseline: ', sum(df_test_3surface['sf_elo_diff_538']>0)/float(len(df_test_3surface))
+	print 'Hard surface elo 538 baseline: ', sum(df_test_hard['sf_elo_diff_538']>0)/float(len(df_test_hard))
+	# print len(df_test_hard)
+	print 'Grass surface elo 538 baseline: ', sum(df_test_grass['sf_elo_diff_538']>0)/float(len(df_test_grass))
+	# print len(df_test_grass)
+	print 'Clay surface elo 538 baseline: ', sum(df_test_clay['sf_elo_diff_538']>0)/float(len(df_test_clay))
+	# print len(df_test_clay)
+
+	# print 'Carpet surface elo 538 baseline: ', sum(df_test_carpet['sf_elo_diff_538']>0)/float(len(df_test_carpet))
+	# print len(df_test_carpet)
+	print 'NaN surface elo 538 baseline: ', sum(df_test_nan['sf_elo_diff_538']>0)/float(len(df_test_nan))
+	# print len(df_test_nan)
+	print '------------------------------------------'
